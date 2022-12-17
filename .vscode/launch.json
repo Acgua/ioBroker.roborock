@@ -1,0 +1,42 @@
+/**
+ * launch.json
+ * Configuration documentation: https://go.microsoft.com/fwlink/?linkid=830387
+ * Example: https://github.com/ioBroker/create-adapter/issues/934
+ * Dev-Server Issue: https://forum.iobroker.net/post/826766
+ */
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch",
+            "request": "launch",
+            "args": ["--debug", "0"],
+            "stopOnEntry": true,
+            "program": "node_modules/iobroker.roborock/build/main.js",
+            "cwd": "${workspaceFolder}/.dev-server/default",
+            "skipFiles": ["<node_internals>/**"],
+            "outputCapture": "std", // https://github.com/ioBroker/dev-docs/issues/35
+            "type": "node"
+        },
+        /**
+         * Examples for attach
+         */
+        {
+            "name": "Attach by Process ID",
+            "request": "attach",
+            "processId": "${command:PickProcess}",
+            "skipFiles": ["<node_internals>/**"],
+            "outputCapture": "std",
+            "type": "node"
+        },
+        {
+            "name": "Attach by IP/Port",
+            "request": "attach",
+            "skipFiles": ["<node_internals>/**"],
+            "address": "127.0.0.1",
+            "port": 9229,
+            "outputCapture": "std",
+            "type": "node"
+        }
+    ]
+}

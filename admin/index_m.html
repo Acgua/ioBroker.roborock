@@ -1,0 +1,103 @@
+<html>
+    <head>
+        <!-- Load ioBroker scripts and styles-->
+        <link rel="stylesheet" type="text/css" href="../../css/adapter.css" />
+        <link rel="stylesheet" type="text/css" href="../../lib/css/materialize.css" />
+
+        <script type="text/javascript" src="../../lib/js/jquery-3.2.1.min.js"></script>
+        <script type="text/javascript" src="../../socket.io/socket.io.js"></script>
+
+        <script type="text/javascript" src="../../js/translate.js"></script>
+        <script type="text/javascript" src="../../lib/js/materialize.js"></script>
+        <script type="text/javascript" src="../../js/adapter-settings.js"></script>
+
+        <!-- Load our own files -->
+        <link rel="stylesheet" type="text/css" href="style.css" />
+        <script type="text/javascript" src="words.js"></script>
+
+        <script type="text/javascript">
+            // This will be called by the admin adapter when the settings page loads
+            function load(settings, onChange) {
+                // example: select elements with id=key and class=value and insert value
+                if (!settings) return;
+                $('.value').each(function () {
+                    var $key = $(this);
+                    var id = $key.attr('id');
+                    if ($key.attr('type') === 'checkbox') {
+                        // do not call onChange direct, because onChange could expect some arguments
+                        $key.prop('checked', settings[id]).on('change', () => onChange());
+                    } else {
+                        // do not call onChange direct, because onChange could expect some arguments
+                        $key.val(settings[id])
+                            .on('change', () => onChange())
+                            .on('keyup', () => onChange());
+                    }
+                });
+                onChange(false);
+                // reinitialize all the Materialize labels on the page if you are dynamically adding inputs:
+                if (M) M.updateTextFields();
+            }
+
+            // This will be called by the admin adapter when the user presses the save button
+            function save(callback) {
+                // example: select elements with class=value and build settings object
+                var obj = {};
+                $('.value').each(function () {
+                    var $this = $(this);
+                    if ($this.attr('type') === 'checkbox') {
+                        obj[$this.attr('id')] = $this.prop('checked');
+                    } else if ($this.attr('type') === 'number') {
+                        obj[$this.attr('id')] = parseFloat($this.val());
+                    } else {
+                        obj[$this.attr('id')] = $this.val();
+                    }
+                });
+                callback(obj);
+            }
+        </script>
+    </head>
+
+    <body>
+        <div class="m adapter-container">
+            <!-- Header Logo and Buttons -->
+            <div class="row" style="margin-top: 5px; margin-bottom: 1px; background-color: #2f4a73">
+                <div class="col s6">
+                    <img class="logo" style="width: 180px" src="roborock2.png" />
+                </div>
+            </div>
+
+            <div style="margin-top: 50px"></div>
+
+            <!-- Content -->
+            <div style="margin: 10px">
+                <!---------------- Roborock Login ---------------->
+                <div class="row">
+                    <p class="translate title">Roborock Account (same as in your Roborock App)</p>
+                    <div class="col s4 input-field">
+                        <input type="text" class="value" id="username" />
+                        <label for="username" class="translate">User Name</label>
+                        <span class="translate">User name</a>
+                    </div>
+                    <div class="col s4 input-field">
+                        <!-- Password encryption: https://github.com/ioBroker/ioBroker.repositories#development-and-coding-best-practices -->
+                        <input type="password" class="value" id="password" />
+                        <label for="password" class="translate">Password</label>
+                        <span class="translate">Password</span>
+                    </div>
+                </div>
+                <!---------------- Expert Settings ---------------->
+                <!--
+                <div class="row">
+                    <p class="translate title">Expert Settings</p>
+                    <div class="col s4 input-field">
+                        <input type="number" min="0" max="100000" class="value" id="cloudTimeout" />
+                        <label for="cloudTimeout">(do not enter anything here // hier nichts eintragen)</label>
+                        <span class="translate">(leave empty)</span>
+                    </div>
+                </div>
+                -->
+            </div>
+            <!-- Content -->
+        </div>
+    </body>
+</html>

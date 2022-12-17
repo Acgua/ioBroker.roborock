@@ -1,0 +1,65 @@
+/* You can delete those if you want. I just found them very helpful */
+* {
+    box-sizing: border-box;
+}
+.m {
+    /* Don't cut off dropdowns! */
+    overflow: initial;
+}
+.m.adapter-container,
+.m.adapter-container > div.App {
+    /* Fix layout/scrolling issues with tabs */
+    height: 100%;
+    width: 100%;
+    position: relative;
+}
+.m .select-wrapper + label {
+    /* The positioning for dropdown labels is messed up */
+    transform: none !important;
+}
+
+label > i[title] {
+    /* Display the help cursor for the tooltip icons and fix their positioning */
+    cursor: help;
+    margin-left: 0.25em;
+}
+
+.dropdown-content {
+    /* Don't wrap text in dropdowns */
+    white-space: nowrap;
+}
+/*************************************************************************************************************************/
+/*************************************************************************************************************************/
+/*************************************************************************************************************************/
+/* Add your styles here */
+
+/* span is set to 0.9em for some unknown reason, we set back to 1.0em  */
+.m span {
+    font-size: 1.0em !important;
+}
+
+.m p.title {
+    font-weight: bold;
+    background-color: #2f4a73;
+}
+
+.m div.row p {
+    margin-left: 10px;
+}
+
+/* unvisited link */
+.m div.row a:link {
+    color: #2696ef !important;
+}
+/* visited link */
+.m div.row a:visited {
+    color: #2696ef !important;
+}
+/* mouse over link */
+.m div.row a:hover {
+    text-decoration: underline;
+}
+/* selected link */
+.m div.row a:active {
+    color: #2696ef;
+}

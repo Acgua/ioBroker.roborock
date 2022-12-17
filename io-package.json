@@ -1,0 +1,103 @@
+{
+    "common": {
+        "name": "roborock",
+        "version": "0.0.1-alpha",
+        "news": {
+            "0.0.1-alpha": {
+                "en": "Alpha version: initial release",
+                "de": "Alpha version: Erstveröffentlichung",
+                "ru": "Alpha version: Начальная версия",
+                "pt": "Alpha version: lançamento inicial",
+                "nl": "Alpha version: Eerste uitgave",
+                "fr": "Alpha version: Première version",
+                "it": "Alpha version: Versione iniziale",
+                "es": "Alpha version: Versión inicial",
+                "pl": "Alpha version: Pierwsze wydanie",
+                "zh-cn": "Alpha version: 首次出版"
+            }
+        },
+        "title": "Roborock",
+        "titleLang": {
+            "en": "Roborock",
+            "de": "Roborock",
+            "ru": "Роборок",
+            "pt": "Roborock",
+            "nl": "Roborock",
+            "fr": "Roborock",
+            "it": "Roborock",
+            "es": "roborock",
+            "pl": "Roborock",
+            "zh-cn": "石头"
+        },
+        "desc": {
+            "en": "Roborock",
+            "de": "Roborock",
+            "ru": "Роборок",
+            "pt": "Roborock",
+            "nl": "Roborock",
+            "fr": "Roborock",
+            "it": "Roborock",
+            "es": "roborock",
+            "pl": "Roborock",
+            "zh-cn": "石头"
+        },
+        "authors": ["Acgua <no@spam.com>"],
+        "keywords": ["roborock"],
+        "license": "Apache-2.0",
+        "platform": "Javascript/Node.js",
+        "main": "build/main.js",
+        "icon": "roborock.png",
+        "enabled": true,
+        "extIcon": "https://raw.githubusercontent.com/Acgua/ioBroker.roborock/main/admin/roborock.png",
+        "readme": "https://github.com/Acgua/ioBroker.roborock/blob/main/README.md",
+        "loglevel": "info",
+        "mode": "daemon",
+        "type": "household",
+        "compact": true,
+        "connectionType": "cloud",
+        "dataSource": "poll",
+        "materialize": true,
+        "dependencies": [
+            {
+                "js-controller": ">=3.0.0"
+            }
+        ],
+        "globalDependencies": [
+            {
+                "admin": ">=4.0.9"
+            }
+        ]
+    },
+    "encryptedNative": ["password"],
+    "protectedNative": ["password"],
+    "native": {
+        "option1": true,
+        "option2": "42"
+    },
+    "objects": [],
+    "instanceObjects": [
+        {
+            "_id": "info",
+            "type": "channel",
+            "common": {
+                "name": "Information"
+            },
+            "native": {}
+        },
+        {
+            "_id": "info.connection",
+            "type": "state",
+            "common": {
+                "role": "indicator.connected",
+                "name": "Device or service connected",
+                "type": "boolean",
+                "read": true,
+                "write": false,
+                "def": false
+            },
+            "native": {
+                "username": ""
+            }
+        }
+    ]
+}
