@@ -21,7 +21,7 @@ import EventEmitter from 'node:events';
  * For all following NPM modules: open console, change dir e.g. to "C:\iobroker\node_modules\ioBroker.roborock\",
  * and execute "npm install <module name>", ex: npm install axios.
  */
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import { Parser } from 'binary-parser';
 import CRC32 from 'crc-32';
 import mqtt from 'mqtt';
@@ -47,6 +47,8 @@ export class Roborock extends utils.Adapter {
     // Other
     public userdata = {} as { [k: string]: any };
     public homedata = {} as { [k: string]: any };
+    private token = '' as string;
+    private loginApi = {} as AxiosInstance;
 
     /**
      * Constructor
@@ -79,26 +81,11 @@ export class Roborock extends utils.Adapter {
             await this.setObjectNotExistsAsync('homedata', { type: 'state', common: { name: 'Roborock homedata', type: 'string', role: 'json', read: true, write: false, def: '' }, native: {} });
 
             // Get userdata and homedata
-            await this.getRoborockUserHomedata();
-
-            // Create objects
-            for (const prod of this.homedata.products) {
-                this.log.debug(`Creating objects for ${prod.name} - id: ${prod.id} ...`);
-                await this.setObjectNotExistsAsync(prod.id, { type: 'device', common: { name: prod.name }, native: {} });
-                await this.setObjectNotExistsAsync(`${prod.id}.info`, { type: 'channel', common: { name: 'Information' }, native: {} });
-                // Erst mal alle als String
-                // TODO: Verbessern
-                for (const itm of prod.schema) {
-                    this.log.debug(`Create state for ${prod.id}.info.${itm.code} ...`);
-                    await this.setObjectNotExistsAsync(`${prod.id}.info.${itm.code}`, { type: 'state', common: { name: `${itm.code}`, type: 'string', role: 'info', read: true, write: false, def: '' }, native: {} });
-                }
+            if (await this.loginGetUserdata()) {
+                await this.getRoborockUserHomedata();
+            } else {
+                this.log.error('Login failed');
             }
-
-            // TODO: This just as a test, to wait certain seconds
-            this.log.info(`- wait 2 seconds ----------------------------------------`);
-            await this.wait(2000);
-
-            await this.main();
         } catch (e) {
             this.log.error(this.err2Str(e));
         }
@@ -141,10 +128,10 @@ export class Roborock extends utils.Adapter {
                         // TODO: we will need to cover all devices, and not just the first one.
                         const deviceId = devices[0].duid; // Simply use the first device.
                         sendRequest(this, deviceId, 'get_prop', ['get_status']).then((result) => {
-                            this.log.info(`${this.homedata.name}: First device get_prop RESULT: ${JSON.stringify(result)}`);
+                            this.log.silly(`${this.homedata.name}: First device get_prop RESULT: ${JSON.stringify(result)}`);
                         });
                         sendRequest(this, deviceId, 'get_map_v1', [], true).then((result) => {
-                            //this.log.info(`${this.homedata.name}: First device get_map_v1 RESULT: ${result}`);
+                            this.log.silly(`${this.homedata.name}: First device get_map_v1 RESULT: ${result}`);
                         });
                     });
                 });
@@ -304,95 +291,125 @@ export class Roborock extends utils.Adapter {
         }
     }
 
+    private async loginGetUserdata(): Promise<boolean> {
+        /********************************
+         * Initialize the login API (which is needed to get access to the real API).
+         ********************************/
+        let success = false as boolean;
+        this.log.debug(`${this.config.username}: Initializing the login API...`);
+        const clientId = crypto.createHash('md5').update(this.config.username).update('should_be_unique').digest().toString('base64');
+        //this.log.debug(`clientId: ${clientId}`);
+        this.loginApi = axios.create({
+            baseURL: 'https://euiot.roborock.com',
+            headers: {
+                header_clientid: clientId,
+            },
+        });
+        // api/v1/getUrlByEmail(email = ...)
+
+        /*********************************
+         * Get userdata
+         *********************************/
+        this.log.debug(`${this.config.username}: Getting user data...`);
+        // Get existing data from ioBroker state 'userdata'
+        //const userdataObj = await this.getStateAsync('userdata');
+        //this.log.debug('Userdata: ' + JSON.stringify(userdataObj));
+        this.log.debug(`${this.config.username}: Freshly getting user data from Roborock Cloud.`);
+        // Log in.
+        try {
+            //data = await this.loginApi
+            await this.loginApi
+                .post(
+                    'api/v1/login',
+                    new URLSearchParams({
+                        username: this.config.username,
+                        password: this.config.password,
+                        needtwostepauth: 'false',
+                    }).toString(),
+                )
+                .then((response: any) => {
+                    this.log.debug('Login Result : ' + JSON.stringify(response.data));
+                    this.userdata = response.data.data;
+                    if (response.data.code === 200) {
+                        // Anmelde-Request erfolgreich
+                        this.setState('info.connection', { val: true, ack: true });
+                        success = true;
+                    }
+                });
+        } catch (err) {
+            this.log.error('Error on Login-Request : ' + JSON.stringify(err));
+        }
+        this.log.debug('Userdata from API: ' + JSON.stringify(this.userdata));
+        // Userdata States zuordnen
+        // TODO: States für Userdata anlegen und füllen
+        // Nur zu Info-Zecken TODO: Wieder raus
+        await this.setStateAsync('userdata', { val: JSON.stringify(this.userdata), ack: true });
+        // Alternative without password:
+        // await loginApi.post('api/v1/sendEmailCode', new url.URLSearchParams({username: username, type: 'auth'}).toString()).then(res => res.data);
+        // // ... get code from user ...
+        // userdata = await loginApi.post('api/v1/loginWithCode', new url.URLSearchParams({username: username, verifycode: code, verifycodetype: 'AUTH_EMAIL_CODE'}).toString()).then(res => res.data.data);
+        return success;
+    }
+
     private async getRoborockUserHomedata(): Promise<void> {
         try {
-            /********************************
-             * Initialize the login API (which is needed to get access to the real API).
-             ********************************/
-            this.log.debug(`${this.config.username}: Initializing the login API...`);
-            const loginApi = axios.create({
-                baseURL: 'https://euiot.roborock.com',
-                headers: {
-                    header_clientid: crypto.createHash('md5').update(this.config.username).update('should_be_unique').digest().toString('base64'),
-                },
-            });
-            // api/v1/getUrlByEmail(email = ...)
-
-            /*********************************
-             * Get userdata
-             *********************************/
-            this.log.debug(`${this.config.username}: Getting user data...`);
-            //let userdata = {} as { [k: string]: any };
-            let updateUserdata = false as true | false;
-            // Get existing data from ioBroker state 'userdata'
-            const userdataObj = await this.getStateAsync('userdata');
-            if (userdataObj && userdataObj.val && typeof userdataObj.val === 'string') {
-                this.userdata = JSON.parse(userdataObj.val);
-                if (!this.userdata.token || this.userdata.token.length < 10) {
-                    this.log.debug(`${this.config.username}: No token available, fetching new user data.`);
-                    updateUserdata = true;
-                }
-                if (!updateUserdata) {
-                    const lastChangeHours = Math.round((Date.now() - userdataObj.lc) / 1000 / 60 / 60); // Last state change, in hours
-                    if (lastChangeHours > 24 * 30) {
-                        this.log.debug(`${this.config.username}: Get new user data from cloud, since last update was more than 30 days ago`);
-                        updateUserdata = true;
-                    } else {
-                        this.log.debug(`${this.config.username}: Last user data update from Cloud: ${lastChangeHours} hours ago. Since less than 30 days: not updating.`);
-                    }
-                }
-            } else {
-                updateUserdata = true;
-            }
-            if (updateUserdata) {
-                this.log.debug(`${this.config.username}: Freshly getting user data from Roborock Cloud.`);
-                // Log in.
-                this.userdata = await loginApi
-                    .post(
-                        'api/v1/login',
-                        new URLSearchParams({
-                            username: this.config.username,
-                            password: this.config.password,
-                            needtwostepauth: 'false',
-                        }).toString(),
-                    )
-                    .then((res) => res.data.data);
-                await this.setStateAsync('userdata', { val: JSON.stringify(this.userdata), ack: true });
-                // Alternative without password:
-                // await loginApi.post('api/v1/sendEmailCode', new url.URLSearchParams({username: username, type: 'auth'}).toString()).then(res => res.data);
-                // // ... get code from user ...
-                // userdata = await loginApi.post('api/v1/loginWithCode', new url.URLSearchParams({username: username, verifycode: code, verifycodetype: 'AUTH_EMAIL_CODE'}).toString()).then(res => res.data.data);
-            }
-
             /*********************************
              * Get home details
              *********************************/
             this.log.debug(`${this.config.username}: Getting home details...`);
-            loginApi.defaults.headers.common['Authorization'] = this.userdata.token;
-            const rriot = this.userdata.rriot;
-            const homeId = await loginApi.get('api/v1/getHomeDetail').then((res) => res.data.data.rrHomeId);
+            if ('token' in this.userdata) {
+                this.loginApi.defaults.headers.common['Authorization'] = this.userdata.token;
+                const rriot = this.userdata.rriot;
+                const homeId = await this.loginApi.get('api/v1/getHomeDetail').then((res) => res.data.data.rrHomeId);
 
-            // Initialize the real API.
-            this.log.debug(`${this.config.username}: Initializing the "real" Roborock API...`);
-            const api = axios.create({
-                baseURL: rriot.r.a,
-            });
-            api.interceptors.request.use((config) => {
-                const timestamp = Math.floor(Date.now() / 1000);
-                const nonce = crypto.randomBytes(6).toString('base64').substring(0, 6).replace('+', 'X').replace('/', 'Y');
-                const url = new URL(api.getUri(config));
-                const prestr = [rriot.u, rriot.s, nonce, timestamp, this.md5hex(url.pathname), /*queryparams*/ '', /*body*/ ''].join(':');
-                const mac = crypto.createHmac('sha256', rriot.h).update(prestr).digest('base64');
-                if (!config?.headers) throw `Expected 'config' and 'config.headers' not to be undefined`;
-                config.headers.Authorization = `Hawk id="${rriot.u}", s="${rriot.s}", ts="${timestamp}", nonce="${nonce}", mac="${mac}"`;
-                return config;
-            });
-            this.homedata = await api.get(`user/homes/${homeId}`).then((res) => res.data.result);
-            if (!this.homedata || !this.homedata.id || !this.homedata.name || !this.homedata.products) throw `${this.config.username}: Could not receive valid home data!`;
-            for (const product of this.homedata.products) {
-                this.log.debug(`${this.homedata.name}: Received ${product.name} (model: ${product.model})`);
+                // Initialize the real API.
+                this.log.debug(`${this.config.username}: Initializing the "real" Roborock API...`);
+                const api = axios.create({
+                    baseURL: rriot.r.a,
+                });
+                api.interceptors.request.use((config) => {
+                    const timestamp = Math.floor(Date.now() / 1000);
+                    const nonce = crypto.randomBytes(6).toString('base64').substring(0, 6).replace('+', 'X').replace('/', 'Y');
+                    const url = new URL(api.getUri(config));
+                    const prestr = [rriot.u, rriot.s, nonce, timestamp, this.md5hex(url.pathname), /*queryparams*/ '', /*body*/ ''].join(':');
+                    const mac = crypto.createHmac('sha256', rriot.h).update(prestr).digest('base64');
+                    if (!config?.headers) throw `Expected 'config' and 'config.headers' not to be undefined`;
+                    config.headers.Authorization = `Hawk id="${rriot.u}", s="${rriot.s}", ts="${timestamp}", nonce="${nonce}", mac="${mac}"`;
+                    return config;
+                });
+                this.homedata = await api.get(`user/homes/${homeId}`).then((res) => res.data.result);
+                if (!this.homedata || !this.homedata.id || !this.homedata.name || !this.homedata.products) throw `${this.config.username}: Could not receive valid home data!`;
+                for (const product of this.homedata.products) {
+                    this.log.debug(`${this.homedata.name}: Received ${product.name} (model: ${product.model})`);
+                }
+                // Nur zu Info-Zecken TODO: Wieder raus
+                await this.setStateAsync('homedata', { val: JSON.stringify(this.homedata), ack: true });
+                // Create objects
+                this.log.debug('products : ' + JSON.stringify(this.homedata.products));
+                if (this.homedata.products) {
+                    for (const prod of this.homedata.products) {
+                        this.log.debug(`Creating objects for ${prod.name} - id: ${prod.id} ...`);
+                        await this.setObjectNotExistsAsync(prod.id, { type: 'device', common: { name: prod.name }, native: {} });
+                        await this.setObjectNotExistsAsync(`${prod.id}.info`, { type: 'channel', common: { name: 'Information' }, native: {} });
+                        // Erst mal alle als String
+                        // TODO: Verbessern
+                        for (const itm of prod.schema) {
+                            this.log.debug(`Create state for ${prod.id}.info.${itm.code} ...`);
+                            await this.setObjectNotExistsAsync(`${prod.id}.info.${itm.code}`, { type: 'state', common: { name: `${itm.code}`, type: 'string', role: 'info', read: true, write: false, def: '' }, native: {} });
+                        }
+                    }
+
+                    // TODO: This just as a test, to wait certain seconds
+                    this.log.info(`- wait 2 seconds ----------------------------------------`);
+                    await this.wait(2000);
+
+                    await this.main();
+                } else {
+                    this.log.error('No homedata available');
+                }
+            } else {
+                this.log.error('Kein Session-Token ermittelt, User/Password falsch?');
             }
-            await this.setStateAsync('homedata', { val: JSON.stringify(this.homedata), ack: true });
         } catch (e) {
             this.log.error(this.err2Str(e));
         }
